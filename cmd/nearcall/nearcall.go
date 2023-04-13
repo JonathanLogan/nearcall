@@ -105,6 +105,7 @@ func main() {
 	ret, err := tx.Send(neartx.RPCURL(trueRPC), nil)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error sending transaction: %s", err)
+		os.Exit(1)
 	}
 	if eData := extractError(ret); eData != nil {
 		_, _ = fmt.Fprintln(os.Stderr, string(eData))
