@@ -15,7 +15,7 @@ Returns execution errors in original format (exit code 2) on stderr. On success 
 
 ## Credentials/Keys
 
-nearcall reads account keys from $Home/.near-credentials/$NETWORK/$ACCOUNT.json, like near-cli.
+nearcall reads account keys from $HOME/.near-credentials/$NETWORK/$ACCOUNT.json, like near-cli.
 Hardware wallets are NOT supported.
 
 
