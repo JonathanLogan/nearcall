@@ -13,6 +13,12 @@ Run `nearcall --help` for information.
 
 Returns execution errors in original format (exit code 2) on stderr. On success no data is printed (exit code 0), unless "-v" flag is given.
 
+## Credentials/Keys
+
+nearcall reads account keys from $Home/.near-credentials/$NETWORK/$ACCOUNT.json, like near-cli.
+Hardware wallets are NOT supported.
+
+
 ## Supported encodings:
 
   - Binary (as is)
