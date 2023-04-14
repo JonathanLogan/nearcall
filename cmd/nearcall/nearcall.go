@@ -20,6 +20,7 @@ var (
 	Receiver string
 	Method   string
 	ArgFile  string
+	Arg      string
 	Encoding string = "binary"
 	Verbose  bool
 )
@@ -30,7 +31,8 @@ func init() {
 	flag.StringVar(&Signer, "signer", "", "Signer/Sender of transaction")
 	flag.StringVar(&Receiver, "receiver", "", "Receiver of transaction")
 	flag.StringVar(&Method, "method", "", "Name of method to call")
-	flag.StringVar(&ArgFile, "arg", "", "File containing the method argument")
+	flag.StringVar(&ArgFile, "argfile", "", "File containing the method argument")
+	flag.StringVar(&Arg, "arg", "", "Method argument")
 	flag.StringVar(&Encoding, "encoding", Encoding, "Encoding for arg: binary, hex, xHex, 0xHex, base64, base58, borsh")
 	flag.BoolVar(&Verbose, "v", false, "Enable verbose transaction output")
 }
@@ -57,8 +59,12 @@ func validateFlags() {
 		_, _ = fmt.Fprintf(os.Stderr, "Error: Missing method argument\n")
 		ok = false
 	}
-	if ArgFile == "" {
-		_, _ = fmt.Fprintf(os.Stderr, "Error: Missing arg argument\n")
+	if ArgFile == "" && Arg == "" {
+		_, _ = fmt.Fprintf(os.Stderr, "Error: Either arg or argfile need to be given\n")
+		ok = false
+	}
+	if ArgFile != "" && Arg != "" {
+		_, _ = fmt.Fprintf(os.Stderr, "Error: Only one of arg or argfile permitted\n")
 		ok = false
 	}
 	if Encoding == "" {
@@ -91,25 +97,34 @@ func extractError(d []byte) []byte {
 }
 
 func main() {
+	var encoded []byte
 	flag.Parse()
 	validateFlags()
 	trueRPC := strings.ReplaceAll(RPC, networkPlaceholder, Network)
 
-	encoded, err := EncodeFile(ArgFile, Encoding)
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error reading and encoding %s: %s\n", ArgFile, err)
-		os.Exit(1)
+	{
+		var err error
+		if ArgFile != "" {
+			encoded, err = EncodeFile(ArgFile, Encoding)
+		}
+		if Arg != "" {
+			encoded, err = neartx.StrFormat(Encoding).Serialize([]byte(Arg))
+		}
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Error reading and encoding %s: %s\n", ArgFile, err)
+			os.Exit(1)
+		}
 	}
 
 	tx := neartx.NewTransaction(Signer, Receiver, neartx.KeyPairFunc(neartx.Network(Network).FileSigner)).AddFunctionCall(Method, encoded, 0, nil)
 	ret, err := tx.Send(neartx.RPCURL(trueRPC), nil)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error sending transaction: %s", err)
-		os.Exit(1)
+		os.Exit(2)
 	}
 	if eData := extractError(ret); eData != nil {
 		_, _ = fmt.Fprintln(os.Stderr, string(eData))
-		os.Exit(2)
+		os.Exit(3)
 	}
 	if Verbose {
 		_, _ = fmt.Fprintln(os.Stdout, string(ret))

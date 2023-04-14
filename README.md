@@ -11,7 +11,7 @@ Install: `go install github.com/JonathanLogan/nearcall/cmd/nearcall@latest`
 
 Run `nearcall --help` for information.
 
-Returns execution errors in original format (exit code 2) on stderr. On success no data is printed (exit code 0), unless "-v" flag is given.
+Returns execution errors in original format (exit code 3) on stderr. On success no data is printed (exit code 0), unless "-v" flag is given.
 
 ## Credentials/Keys
 
