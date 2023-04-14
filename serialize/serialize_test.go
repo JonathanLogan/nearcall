@@ -1,4 +1,4 @@
-package neartx
+package serialize
 
 import (
 	// "fmt"

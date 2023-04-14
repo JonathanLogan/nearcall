@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/JonathanLogan/nearcall/neartx"
+	"github.com/JonathanLogan/nearcall/serialize"
 	json "github.com/buger/jsonparser"
 	"os"
 	"strings"
@@ -14,15 +15,16 @@ const (
 )
 
 var (
-	Network  string = "mainnet"
-	RPC      string = "https://rpc." + networkPlaceholder + ".near.org/"
-	Signer   string
-	Receiver string
-	Method   string
-	ArgFile  string
-	Arg      string
-	Encoding string = "binary"
-	Verbose  bool
+	Network        string = "mainnet"
+	RPC            string = "https://rpc." + networkPlaceholder + ".near.org/"
+	Signer         string
+	Receiver       string
+	Method         string
+	ArgFile        string
+	Arg            string
+	OutputEncoding string = "binary"
+	InputEncoding  string = "binary"
+	Verbose        bool
 )
 
 func init() {
@@ -33,7 +35,8 @@ func init() {
 	flag.StringVar(&Method, "method", "", "Name of method to call")
 	flag.StringVar(&ArgFile, "argfile", "", "File containing the method argument")
 	flag.StringVar(&Arg, "arg", "", "Method argument")
-	flag.StringVar(&Encoding, "encoding", Encoding, "Encoding for arg: binary, hex, xHex, 0xHex, base64, base58, borsh")
+	flag.StringVar(&OutputEncoding, "out", OutputEncoding, "Output encoding for arg: binary, hex, xHex, 0xHex, base64, base58, borsh")
+	flag.StringVar(&InputEncoding, "in", InputEncoding, "Input encoding for arg: binary, hex, xHex, 0xHex, base64, base58, borsh")
 	flag.BoolVar(&Verbose, "v", false, "Enable verbose transaction output")
 }
 
@@ -67,8 +70,12 @@ func validateFlags() {
 		_, _ = fmt.Fprintf(os.Stderr, "Error: Only one of arg or argfile permitted\n")
 		ok = false
 	}
-	if Encoding == "" {
-		_, _ = fmt.Fprintf(os.Stderr, "Error: Missing encoding argument\n")
+	if OutputEncoding == "" {
+		_, _ = fmt.Fprintf(os.Stderr, "Error: Missing output encoding argument\n")
+		ok = false
+	}
+	if InputEncoding == "" {
+		_, _ = fmt.Fprintf(os.Stderr, "Error: Missing input encoding argument\n")
 		ok = false
 	}
 	if !ok {
@@ -76,12 +83,12 @@ func validateFlags() {
 	}
 }
 
-func EncodeFile(filename, encoding string) ([]byte, error) {
-	d, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-	return neartx.StrFormat(encoding).Serialize(d)
+func GetFile(filename string) ([]byte, error) {
+	return os.ReadFile(filename)
+	// if err != nil {
+	// return nil, err
+	// }
+	// return neartx.StrFormat(encoding).Serialize(d)
 }
 
 func extractError(d []byte) []byte {
@@ -104,14 +111,24 @@ func main() {
 
 	{
 		var err error
+		var input []byte
 		if ArgFile != "" {
-			encoded, err = EncodeFile(ArgFile, Encoding)
+			if input, err = GetFile(ArgFile); err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "Error reading file: %s\n", err)
+				os.Exit(1)
+			}
+			// encoded, err = EncodeFile(ArgFile, OutputEncoding)
+		} else if Arg != "" {
+			input = []byte(Arg)
 		}
-		if Arg != "" {
-			encoded, err = neartx.StrFormat(Encoding).Serialize([]byte(Arg))
-		}
+		input, err = serialize.StrFormat(InputEncoding).Deserialize(input)
 		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "Error reading and encoding %s: %s\n", ArgFile, err)
+			_, _ = fmt.Fprintf(os.Stderr, "Error decoding input: %s\n", err)
+			os.Exit(1)
+		}
+		encoded, err = serialize.StrFormat(OutputEncoding).Serialize(input)
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "Error encoding %s: %s\n", ArgFile, err)
 			os.Exit(1)
 		}
 	}
@@ -119,7 +136,7 @@ func main() {
 	tx := neartx.NewTransaction(Signer, Receiver, neartx.KeyPairFunc(neartx.Network(Network).FileSigner)).AddFunctionCall(Method, encoded, 0, nil)
 	ret, err := tx.Send(neartx.RPCURL(trueRPC), nil)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Error sending transaction: %s", err)
+		_, _ = fmt.Fprintf(os.Stderr, "Error sending transaction: %s\n", err)
 		os.Exit(2)
 	}
 	if eData := extractError(ret); eData != nil {
