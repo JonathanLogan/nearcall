@@ -5,7 +5,7 @@ Make calls to NEAR contracts with a single argument sourced from file.
 
 Requires go >= 1.20.
 
-Install: `go install github.com/JonathanLogan/nearcall/cmd/nearcall@0.0.1`
+Install: `go install github.com/JonathanLogan/nearcall/cmd/nearcall@0.0.2`
 
 ## Usage
 
