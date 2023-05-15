@@ -6,6 +6,7 @@ import (
 	"github.com/JonathanLogan/nearcall/neartx"
 	"github.com/JonathanLogan/nearcall/serialize"
 	json "github.com/buger/jsonparser"
+	"math/big"
 	"os"
 	"strings"
 )
@@ -25,6 +26,7 @@ var (
 	OutputEncoding string = "binary"
 	InputEncoding  string = "binary"
 	Verbose        bool
+	Deposit        string
 )
 
 func init() {
@@ -37,6 +39,7 @@ func init() {
 	flag.StringVar(&Arg, "arg", "", "Method argument")
 	flag.StringVar(&OutputEncoding, "out", OutputEncoding, "Output encoding for arg: binary, hex, xHex, 0xHex, base64, base58, borsh")
 	flag.StringVar(&InputEncoding, "in", InputEncoding, "Input encoding for arg: binary, hex, xHex, 0xHex, base64, base58, borsh")
+	flag.StringVar(&Deposit, "deposit", "", "Attach yoctoNear")
 	flag.BoolVar(&Verbose, "v", false, "Enable verbose transaction output")
 }
 
@@ -78,6 +81,11 @@ func validateFlags() {
 		_, _ = fmt.Fprintf(os.Stderr, "Error: Missing input encoding argument\n")
 		ok = false
 	}
+	if Deposit != "" {
+		if _, ok := new(big.Int).SetString(Deposit, 10); !ok {
+			_, _ = fmt.Fprintf(os.Stderr, "Error: Deposit cannot be parsed as decimal integer\n")
+		}
+	}
 	if !ok {
 		os.Exit(1)
 	}
@@ -105,8 +113,10 @@ func extractError(d []byte) []byte {
 
 func main() {
 	var encoded []byte
+	var deposit *big.Int
 	flag.Parse()
 	validateFlags()
+	deposit, _ = new(big.Int).SetString(Deposit, 10)
 	trueRPC := strings.ReplaceAll(RPC, networkPlaceholder, Network)
 
 	{
@@ -133,7 +143,7 @@ func main() {
 		}
 	}
 
-	tx := neartx.NewTransaction(Signer, Receiver, neartx.KeyPairFunc(neartx.Network(Network).FileSigner)).AddFunctionCall(Method, encoded, 0, nil)
+	tx := neartx.NewTransaction(Signer, Receiver, neartx.KeyPairFunc(neartx.Network(Network).FileSigner)).AddFunctionCall(Method, encoded, 0, deposit)
 	ret, err := tx.Send(neartx.RPCURL(trueRPC), nil)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Error sending transaction: %s\n", err)
