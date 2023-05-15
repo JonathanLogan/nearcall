@@ -6,6 +6,7 @@ import (
 	"github.com/JonathanLogan/nearcall/neartx"
 	"github.com/JonathanLogan/nearcall/serialize"
 	json "github.com/buger/jsonparser"
+	"io/ioutil"
 	"math/big"
 	"os"
 	"strings"
@@ -26,6 +27,7 @@ var (
 	OutputEncoding string = "binary"
 	InputEncoding  string = "binary"
 	Verbose        bool
+	Simulate       bool
 	Deposit        string
 )
 
@@ -41,29 +43,37 @@ func init() {
 	flag.StringVar(&InputEncoding, "in", InputEncoding, "Input encoding for arg: binary, hex, xHex, 0xHex, base64, base58, borsh")
 	flag.StringVar(&Deposit, "deposit", "", "Attach yoctoNear")
 	flag.BoolVar(&Verbose, "v", false, "Enable verbose transaction output")
+	flag.BoolVar(&Simulate, "s", false, "Do not make call, only convert data")
 }
 
 func validateFlags() {
 	var ok bool = true
-	if Network == "" {
-		_, _ = fmt.Fprintf(os.Stderr, "Error: Missing network argument\n")
-		ok = false
-	}
-	if RPC == "" {
-		_, _ = fmt.Fprintf(os.Stderr, "Error: Missing rpc argument\n")
-		ok = false
-	}
-	if Signer == "" {
-		_, _ = fmt.Fprintf(os.Stderr, "Error: Missing signer argument\n")
-		ok = false
-	}
-	if Receiver == "" {
-		_, _ = fmt.Fprintf(os.Stderr, "Error: Missing receiver argument\n")
-		ok = false
-	}
-	if Method == "" {
-		_, _ = fmt.Fprintf(os.Stderr, "Error: Missing method argument\n")
-		ok = false
+	if !Simulate {
+		if Network == "" {
+			_, _ = fmt.Fprintf(os.Stderr, "Error: Missing network argument\n")
+			ok = false
+		}
+		if RPC == "" {
+			_, _ = fmt.Fprintf(os.Stderr, "Error: Missing rpc argument\n")
+			ok = false
+		}
+		if Signer == "" {
+			_, _ = fmt.Fprintf(os.Stderr, "Error: Missing signer argument\n")
+			ok = false
+		}
+		if Receiver == "" {
+			_, _ = fmt.Fprintf(os.Stderr, "Error: Missing receiver argument\n")
+			ok = false
+		}
+		if Method == "" {
+			_, _ = fmt.Fprintf(os.Stderr, "Error: Missing method argument\n")
+			ok = false
+		}
+		if Deposit != "" {
+			if _, ok := new(big.Int).SetString(Deposit, 10); !ok {
+				_, _ = fmt.Fprintf(os.Stderr, "Error: Deposit cannot be parsed as decimal integer\n")
+			}
+		}
 	}
 	if ArgFile == "" && Arg == "" {
 		_, _ = fmt.Fprintf(os.Stderr, "Error: Either arg or argfile need to be given\n")
@@ -81,17 +91,15 @@ func validateFlags() {
 		_, _ = fmt.Fprintf(os.Stderr, "Error: Missing input encoding argument\n")
 		ok = false
 	}
-	if Deposit != "" {
-		if _, ok := new(big.Int).SetString(Deposit, 10); !ok {
-			_, _ = fmt.Fprintf(os.Stderr, "Error: Deposit cannot be parsed as decimal integer\n")
-		}
-	}
 	if !ok {
 		os.Exit(1)
 	}
 }
 
 func GetFile(filename string) ([]byte, error) {
+	if filename == "-" {
+		return ioutil.ReadAll(os.Stdin)
+	}
 	return os.ReadFile(filename)
 	// if err != nil {
 	// return nil, err
@@ -142,7 +150,10 @@ func main() {
 			os.Exit(1)
 		}
 	}
-
+	if Simulate {
+		_, _ = fmt.Fprintf(os.Stdout, "%s\n", string(encoded))
+		os.Exit(0)
+	}
 	tx := neartx.NewTransaction(Signer, Receiver, neartx.KeyPairFunc(neartx.Network(Network).FileSigner)).AddFunctionCall(Method, encoded, 0, deposit)
 	ret, err := tx.Send(neartx.RPCURL(trueRPC), nil)
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"github.com/mr-tron/base58"
 	"github.com/near/borsh-go"
 	"strings"
+	"bytes"
 )
 
 func (format StrFormat) Deserialize(d []byte) ([]byte, error) {
@@ -31,19 +32,26 @@ func (format StrFormat) Deserialize(d []byte) ([]byte, error) {
 	}
 }
 
+func trim(d []byte)[]byte{
+	return bytes.Trim(d,"\n ")
+}
+
 func (format Format) Deserialize(d []byte) ([]byte, error) {
 	switch format {
 	case Binary:
 		return d, nil
 	case Base64:
+		d=trim(d)
 		out := make([]byte, base64.StdEncoding.DecodedLen(len(d)))
 		if _, err := base64.StdEncoding.Decode(out, d); err != nil {
 			return nil, err
 		}
 		return out, nil
 	case Base58:
+		d=trim(d)
 		return base58.Decode(string(d))
 	case Hex, XHex, ZxHex:
+		d=trim(d)
 		if d[0] == 'x' {
 			d = d[1:]
 		} else if d[0] == '0' && d[1] == 'x' {
